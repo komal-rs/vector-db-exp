@@ -1,7 +1,8 @@
-use super::index::{generate_index, Vector};
 use ciborium::de;
 use ic_stable_structures::{storable::Bound, Storable};
-use instant_distance::{HnswMap, Search};
+use oasysdb::collection::{Record, SearchResult};
+use oasysdb::err::Error;
+use oasysdb::vector::Vector;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::{collections::HashSet, usize};
@@ -15,9 +16,7 @@ pub struct Metadata {
 pub struct Collection {
     pub dimension: usize,
     pub metadata: Metadata,
-    inner: HnswMap<Vector, String>,
-    keys: Vec<Vector>,
-    values: Vec<String>,
+    inner: oasysdb::collection::Collection,
 }
 
 impl Storable for Collection {
@@ -48,11 +47,11 @@ impl Storable for Collection {
 // }
 
 impl Collection {
-    pub fn new(keys: Vec<Vector>, values: Vec<String>, dimension: usize) -> Self {
+    pub fn new(dimension: usize) -> Self {
+        let config = oasysdb::collection::Config::default();
+
         Collection {
-            keys: keys.clone(),
-            values: values.clone(),
-            inner: generate_index(keys, values),
+            inner: oasysdb::collection::Collection::new(&config),
             dimension,
             metadata: Metadata {
                 file_names: HashSet::new(),
@@ -60,35 +59,13 @@ impl Collection {
         }
     }
 
-    pub fn append(
-        &mut self,
-        keys: &mut Vec<Vector>,
-        values: &mut Vec<String>,
-        file_name: String,
-    ) -> Result<(), String> {
-        if keys.len() != values.len() {
-            return Err(String::from("length of keys not euqal to values'"));
-        }
-        self.keys.append(keys);
-        self.values.append(values);
-        self.metadata.file_names.insert(file_name);
+    pub fn append(&mut self, records: &Vec<Record>) -> Result<(), String> {
+        self.inner.insert_many(records).map_err(|e| e.to_string())?;
 
         Ok(())
     }
 
-    pub fn query(&self, key: &Vector, search: &mut Search, limit: i32) -> Vec<(f32, String)> {
-        let mut res: Vec<(f32, String)> = vec![];
-        let mut iter = self.inner.search(key, search);
-        for _ in 0..limit {
-            match iter.next() {
-                Some(v) => res.push((v.point.cos_sim(key), (*v.value).clone())),
-                None => break,
-            }
-        }
-
-        res
-    }
-    pub fn build_index(&mut self) {
-        self.inner = generate_index(self.keys.clone(), self.values.clone())
+    pub fn query(&self, vector: &Vector, limit: u32) -> Result<Vec<SearchResult>, Error> {
+        self.inner.search(vector, 100000)
     }
 }

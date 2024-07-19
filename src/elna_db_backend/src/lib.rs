@@ -1,19 +1,23 @@
 extern crate elna_auth_macros;
 
 mod database;
+use std::collections::HashMap;
+
 use candid::Principal;
 use database::db::DB;
 use database::error::Error;
 use database::memory::get_upgrades_memory;
+use database::types::{RequestRecord, RequestSearchResult};
 use database::users::{ADMINS, OWNER};
 use elna_auth_macros::check_authorization;
 use ic_cdk::{post_upgrade, pre_upgrade, query, update};
 use ic_cdk_macros::export_candid;
 use ic_stable_structures::writer::Writer;
 use ic_stable_structures::Memory as _;
+use oasysdb::collection::Record;
 
 #[update]
-#[check_authorization]
+// #[check_authorization]
 fn create_collection(name: String, dimension: usize) -> Result<(), Error> {
     DB.with(|db| {
         let mut db = db.borrow_mut();
@@ -22,30 +26,27 @@ fn create_collection(name: String, dimension: usize) -> Result<(), Error> {
 }
 
 #[update]
-#[check_authorization]
-fn insert(
-    name: String,
-    keys: Vec<Vec<f32>>,
-    values: Vec<String>,
-    file_name: String,
-) -> Result<(), Error> {
+// #[check_authorization]
+fn insert(name: String, keys: Vec<RequestRecord>) -> Result<(), Error> {
+    let keys_record = keys.into_iter().map(|key| Record::from(key)).collect();
+
     DB.with(|db| {
         let mut db = db.borrow_mut();
-        db.insert_into_collection(&name, keys, values, file_name)
+        db.insert_into_collection(&name, keys_record)
     })
 }
 
-#[update]
-#[check_authorization]
-fn build_index(name: String) -> Result<(), Error> {
-    DB.with(|db| {
-        let mut db = db.borrow_mut();
-        db.build_index(&name)
-    })
-}
+// #[update]
+// // #[check_authorization]
+// fn build_index(name: String) -> Result<(), Error> {
+//     DB.with(|db| {
+//         let mut db = db.borrow_mut();
+//         db.build_index(&name)
+//     })
+// }
 
 #[update]
-#[check_authorization]
+// #[check_authorization]
 fn delete_collection(name: String) -> Result<(), Error> {
     DB.with(|db| {
         let mut db = db.borrow_mut();
@@ -54,17 +55,18 @@ fn delete_collection(name: String) -> Result<(), Error> {
 }
 
 #[query]
-#[check_authorization]
-fn query(name: String, q: Vec<f32>, limit: i32) -> Result<Vec<String>, Error> {
+// #[check_authorization]
+fn search(name: String, q: Vec<f32>, limit: u32) -> Result<Vec<RequestSearchResult>, Error> {
     DB.with(|db| {
         let mut db = db.borrow_mut();
         let result = db.query(&name, q, limit);
         match result {
             Ok(data) => {
-                // Extract the Vec<(f32, String)> from the Ok variant
-                let (_, strings): (Vec<_>, Vec<_>) = data.into_iter().unzip();
-                // println!("Floats: {:?}", floats);
-                Ok(strings)
+                let data = data
+                    .into_iter()
+                    .map(|record| RequestSearchResult::from(record))
+                    .collect();
+                Ok(data)
             }
             Err(error) => {
                 println!("Error: {}", error);
@@ -75,20 +77,11 @@ fn query(name: String, q: Vec<f32>, limit: i32) -> Result<Vec<String>, Error> {
 }
 
 #[query]
-#[check_authorization]
+// #[check_authorization]
 fn get_collections() -> Result<Vec<String>, Error> {
     DB.with(|db| {
         let db = db.borrow();
         Ok(db.get_all_collections())
-    })
-}
-
-#[query]
-#[check_authorization]
-fn get_docs(index_name: String) -> Result<Vec<String>, Error> {
-    DB.with(|db| {
-        let mut db = db.borrow_mut();
-        db.get_docs(&index_name)
     })
 }
 

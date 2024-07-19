@@ -9,14 +9,13 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-nalgebra = {version = "0.32.3", default-features = false, features = ["libm", "alloc","serde-serialize","std"]}
-instant-distance = { git = "https://github.com/elna-ai/instant-distance", version = "0.6.1",features = ["serde","serde-big-array"]}
 thiserror = "1.0.40"
 ic-cdk = "0.11.0"
 ic-cdk-macros = "0.8.1"
-candid  = "0.9.9"
+candid = "0.9.9"
 ic-stable-structures = "0.6.0-beta.2"
 serde = "1"
 ciborium = "0.2.1"
 elna_auth_macros = { path = "../elna_auth_macros" }
-
+oasysdb = "0.6.1"
+getrandom = { version = "0.2", features = ["js"] }
